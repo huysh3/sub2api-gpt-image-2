@@ -172,8 +172,6 @@ def common_payload(args: argparse.Namespace) -> dict[str, Any]:
         fail("--prompt must not be blank.")
     if not 1 <= args.n <= 10:
         fail("--n must be between 1 and 10.")
-    if args.model == "gpt-image-2" and args.background == "transparent":
-        fail("gpt-image-2 does not support transparent output; explicitly choose gpt-image-1.5.")
     if args.model == "gpt-image-2" and args.size != "auto":
         match = re.fullmatch(r"([1-9][0-9]*)x([1-9][0-9]*)", args.size)
         if not match:

@@ -66,7 +66,7 @@ python3 ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
 
 - `doctor` 只能验证路由连通和模型列表，不能保证付费生成一定成功。
 - 不自动重试付费请求。
-- `gpt-image-2` 不支持原生透明输出；透明图片需显式切换到 `gpt-image-1.5`。
+- `gpt-image-2` 支持透明背景；请求透明背景时使用 PNG（默认）或 WebP 输出。
 - 实际支持的模型、尺寸和质量参数取决于上游兼容实现。
 
 ## License

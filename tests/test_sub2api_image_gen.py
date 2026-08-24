@@ -27,7 +27,11 @@ class Handler(BaseHTTPRequestHandler):
         assert self.path in {"/v1/images/generations", "/v1/images/edits"}
         assert self.headers["X-Test-Header"] == "kept"
         request = self.rfile.read(int(self.headers["Content-Length"]))
-        assert b"test image" in request
+        assert b"test image" in request or b"transparent image" in request
+        if b"transparent image" in request:
+            assert b'"model": "gpt-image-2"' in request
+            assert b'"background": "transparent"' in request
+            assert b'"output_format": "png"' in request
         if self.path.endswith("/edits"):
             assert b'name="image"' in request
             assert PNG_1X1 in request
@@ -59,6 +63,9 @@ def main():
         subprocess.run(["python3", str(SCRIPT), "doctor", "--config", str(config)], check=True)
         subprocess.run(["python3", str(SCRIPT), "generate", "--config", str(config), "--prompt", "test image", "--out", str(output)], check=True)
         assert output.read_bytes() == PNG_1X1
+        transparent = root / "transparent.png"
+        subprocess.run(["python3", str(SCRIPT), "generate", "--config", str(config), "--prompt", "transparent image", "--background", "transparent", "--output-format", "png", "--out", str(transparent)], check=True)
+        assert transparent.read_bytes() == PNG_1X1
         edited = root / "edited.png"
         subprocess.run(["python3", str(SCRIPT), "edit", "--config", str(config), "--image", str(output), "--prompt", "test image", "--out", str(edited)], check=True)
         assert edited.read_bytes() == PNG_1X1

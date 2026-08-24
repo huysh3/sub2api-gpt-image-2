@@ -53,5 +53,5 @@ Use `--dry-run` to inspect a redacted request without network or cost. Use `--pr
 - Never auto-retry a paid request. Surface the API error and change only the demonstrated cause.
 - Never claim requested dimensions are actual dimensions; report the decoded/API-reported output size.
 - Do not overwrite an existing file unless the user requested replacement; otherwise choose a versioned filename. `--force` is explicit overwrite authorization.
-- `gpt-image-2` is the default. It does not support native transparent output; use `gpt-image-1.5 --background transparent --output-format png` only when the user explicitly requests or confirms that model fallback.
+- `gpt-image-2` supports transparent output. For a transparent background, keep the default model and pass `--background transparent --output-format png` (or `webp`).
 - Prefer the built-in `image_gen` tool when it is actually available and working. This skill exists for the custom-provider fallback path.
