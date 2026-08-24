@@ -9,10 +9,10 @@ Use the bundled dependency-free client instead of the system `imagegen` CLI. It 
 
 ## Workflow
 
-1. Resolve the script relative to this `SKILL.md`; the examples below assume the repository root. Run the no-cost connectivity check:
+1. Resolve `<skill-dir>` as the directory containing this `SKILL.md`. Run the no-cost connectivity check:
 
    ```bash
-   python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
+   python3 "<skill-dir>/scripts/sub2api_image_gen.py" doctor
    ```
 
 2. Normalize the user's request into a concise prompt. Preserve exact text and explicitly state edit invariants such as `change only the background; keep the subject unchanged`.
@@ -23,7 +23,7 @@ Use the bundled dependency-free client instead of the system `imagegen` CLI. It 
 Generate:
 
 ```bash
-python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate \
+python3 "<skill-dir>/scripts/sub2api_image_gen.py" generate \
   --prompt "A ceramic coffee mug in soft studio light; no logo, text, or watermark" \
   --quality medium \
   --out output/imagegen/mug.png
@@ -32,7 +32,7 @@ python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate \
 Edit:
 
 ```bash
-python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py edit \
+python3 "<skill-dir>/scripts/sub2api_image_gen.py" edit \
   --image input.png \
   --prompt "Replace only the background with a warm sunset; keep the product and edges unchanged" \
   --out output/imagegen/sunset-edit.png

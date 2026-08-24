@@ -2,7 +2,7 @@
 
 一个给 Codex 使用的图片生成 Skill：当内置 `$imagegen` 不可用、缺失或被自定义 provider / sub2api 拦截时，改用当前 Codex provider 直接调用兼容的 Images API。
 
-![工作原理](output/imagegen/sub2api-imagegen-principle-pixel-islands-v2.png)
+![工作原理](assets/sub2api-imagegen-principle.png)
 
 ## 特点
 
@@ -20,52 +20,34 @@
 
 ## 安装
 
-仓库内使用：保留当前目录结构，Codex 会从 `.agents/skills/sub2api-imagegen` 发现 Skill。
-
-安装到用户目录：
+把整个仓库直接克隆到 Skill 目录：
 
 ```bash
 mkdir -p ~/.agents/skills
-cp -R .agents/skills/sub2api-imagegen ~/.agents/skills/
+git clone https://github.com/huysh3/sub2api-gpt-image-2.git ~/.agents/skills/sub2api-imagegen
 ```
 
-重启 Codex 或开启一个新任务后，通过 `$sub2api-imagegen` 使用。
+仓库根目录就是 Skill 根目录，不需要绑定或创建专属 Agent。重启 Codex 或开启一个新任务即可使用。
 
 ## 使用
 
-先检查当前路由和模型是否可用；此命令不会生成图片：
+直接在 Codex 中调用：
 
-```bash
-python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
+```text
+$sub2api-imagegen 帮我生成一张雨夜霓虹街道的横版图片
 ```
 
-生成图片：
+编辑已有图片也是一句话：
 
-```bash
-python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate \
-  --prompt "A ceramic coffee mug in soft studio light; no logo, text, or watermark" \
-  --quality medium \
-  --out output/imagegen/mug.png
+```text
+$sub2api-imagegen 把 input.png 的背景换成日落，主体保持不变
 ```
 
-编辑图片：
+Codex 当前显式调用 Skill 使用 `$skill-name`；不需要手动执行底层 Python 命令。只有排查 provider 连通性时才需要：
 
 ```bash
-python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py edit \
-  --image input.png \
-  --prompt "Replace only the background with a warm sunset; keep the product and edges unchanged" \
-  --out output/imagegen/sunset-edit.png
+python3 ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
 ```
-
-只查看脱敏后的请求，不发起网络请求或产生图片费用：
-
-```bash
-python3 .agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate \
-  --prompt "test image" \
-  --dry-run
-```
-
-完整参数可通过子命令的 `--help` 查看。环境变量 `OPENAI_BASE_URL` 和 `OPENAI_API_KEY` 优先于 Codex 配置；也可用 `--provider` 或 `--config` 指定其他本地配置。
 
 ## 分辨率说明
 

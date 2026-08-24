@@ -1,7 +1,0 @@
-interface:
-  display_name: "Sub2API ImageGen"
-  short_description: "Generate images through the active sub2api provider"
-  default_prompt: "Use $sub2api-imagegen to generate an image through my active Codex provider."
-
-policy:
-  allow_implicit_invocation: true
