@@ -49,6 +49,10 @@ Codex 当前显式调用 Skill 使用 `$skill-name`；不需要手动执行底�
 python3 ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
 ```
 
+当前已在 Codex 图片策略选择「启用 Hosted 桥接」的配置下测试通过：
+
+![Codex 图片策略启用 Hosted 桥接](assets/codex-hosted-image-bridge.png)
+
 ## 分辨率说明
 
 这里的 `3840x2160` 是 **4K 入参**，不是 4K 输出承诺。不同 sub2api 账号路由或兼容 provider 可能返回不同尺寸；客户端会检测实际 PNG 尺寸、提示差异，并原样保存服务端字节。当前已观察到 OpenAI OAuth 路由接受 `3840x2160`，但返回 `1672x941`。
