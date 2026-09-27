@@ -4,15 +4,13 @@
 
 一个给 Codex 使用的图片生成 Skill：当内置 `$imagegen` 不可用、缺失或被自定义 provider / sub2api 拦截时，改用当前 Codex provider 直接调用兼容的 Images API。
 
-![工作原理](assets/sub2api-imagegen-principle.png)
-
 ## 特点
 
 - 自动读取当前 Codex provider 的 `base_url`、`experimental_bearer_token` 和自定义请求头。
 - 使用非 OpenAI SDK 的 User-Agent，绕开已知的 sub2api / Cloudflare SDK 请求头拦截。
 - 支持图片生成、图片编辑、无费用连通性检查和脱敏 dry run。
 - 仅依赖 Python 标准库，不安装 OpenAI SDK。
-- 默认使用 `gpt-image-2.5-sunburst`，尺寸为 `auto`；可用 `--model gpt-image-2` 保留旧模型和 `3840x2160` 默认尺寸；服务端返回多大就原样保存多大，不在本地超分、缩放、补边或重采样。
+- 默认使用 `gpt-image-2.5-sunburst`，尺寸为 `auto`；服务端返回多大就原样保存多大，不在本地超分、缩放、补边或重采样。
 
 ## 环境要求
 
@@ -33,17 +31,30 @@ git clone https://github.com/huysh3/sub2api-gpt-image-2.git ~/.agents/skills/sub
 
 ## 使用
 
-直接在 Codex 中调用：
+在提示词中指定模型，Codex 会把选择转换为客户端的 `--model` 参数：
 
 ```text
-$sub2api-imagegen 帮我生成一张雨夜霓虹街道的横版图片
+$sub2api-imagegen 用 Flare 快速生成一张雨夜霓虹街道的横版图片
 ```
-
-编辑已有图片也是一句话：
 
 ```text
-$sub2api-imagegen 把 input.png 的背景换成日落，主体保持不变
+$sub2api-imagegen 用 Sunburst 编辑 input.png，只把背景换成日落，主体和文字保持不变
 ```
+
+也可以直接写完整模型名，例如：
+
+```text
+$sub2api-imagegen 使用 gpt-image-2.5-sunburst，纯文字生成一张像素风海报，不使用参考图
+```
+
+| 提示词意图 | Codex 传入的模型 |
+| --- | --- |
+| 明确指定 Flare / Sunburst 或完整模型名 | 严格使用指定型号，优先于下面的自动选择 |
+| 未指定型号，强调快速、草稿、日常生图 | `gpt-image-2.5-flare` |
+| 未指定型号，强调精细编辑、保留主体或文字细节 | `gpt-image-2.5-sunburst` |
+| 未指定型号，也没有明确偏好 | `gpt-image-2.5-sunburst`（默认） |
+
+两型号都能生成和编辑。上述路由由 Codex 按 SKILL 指令执行；Python 客户端不会解析 `--prompt` 中的模型名。直接运行命令时必须用 `--model` 选择，不能只在画面描述里写“Flare”。若所选型号不可用，报告错误，不静默换型号。
 
 Codex 当前显式调用 Skill 使用 `$skill-name`；不需要手动执行底层 Python 命令。只有排查 provider 连通性时才需要：
 
@@ -87,9 +98,7 @@ uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate -
 
 ## 分辨率说明
 
-旧模型 `gpt-image-2` 默认使用的 `3840x2160` 是 **4K 入参**，不是 4K 输出承诺。不同 sub2api 账号路由或兼容 provider 可能返回不同尺寸；客户端会检测实际 PNG 尺寸、提示差异，并原样保存服务端字节。当前已观察到 OpenAI OAuth 路由接受 `3840x2160`，但返回 `1672x941`。
-
-依据：[OpenAI `gpt-image-2` 常用尺寸](https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide#popular-gpt-image-2-sizes)；[sub2api OAuth 实际尺寸测试](https://github.com/Wei-Shaw/sub2api/blob/d45135d87df16d48637f04ccd245727bc955ba54/backend/internal/service/openai_images_actual_size_test.go#L42-L54)。
+尺寸默认 `auto`，也可用 `--size 1536x864` 等合法尺寸显式指定。请求尺寸不等于输出承诺；客户端检测实际 PNG 尺寸，遇到差异会提示，并原样保存服务端字节，不进行本地放大、缩放或补边。
 
 ## 安全说明
 
@@ -102,7 +111,7 @@ uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate -
 
 - `doctor` 只能验证路由连通和模型列表，不能保证付费生成一定成功。
 - 不自动重试付费请求。
-- `gpt-image-2` 支持透明背景；请求透明背景时使用 PNG（默认）或 WebP 输出。
+- Sunburst 和 Flare 均支持透明背景；使用 `--background transparent --output-format png`（或 `webp`）。
 - 实际支持的模型、尺寸和质量参数取决于上游兼容实现。
 
 ## License
