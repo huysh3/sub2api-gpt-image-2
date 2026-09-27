@@ -5,7 +5,7 @@ description: "Generate or edit raster images through the current Codex custom pr
 
 # Sub2API Image Generation
 
-Use the bundled dependency-free client instead of the system `imagegen` CLI. It reads the active provider's `base_url`, `experimental_bearer_token`, and `http_headers` from Codex config, then sends a non-SDK User-Agent to avoid the known sub2api/Cloudflare SDK-header block.
+Use the bundled dependency-free client instead of the system `imagegen` CLI. It reads the active provider's `base_url`, `experimental_bearer_token`, and `http_headers` from Codex config, falling back to the adjacent `auth.json` top-level `OPENAI_API_KEY` when no environment/config key is set, then sends a non-SDK User-Agent to avoid the known sub2api/Cloudflare SDK-header block.
 
 ## Workflow
 
@@ -14,6 +14,8 @@ Use the bundled dependency-free client instead of the system `imagegen` CLI. It 
    ```bash
    python3 "<skill-dir>/scripts/sub2api_image_gen.py" doctor
    ```
+
+   Requires Python 3.11+. If Python is missing or older, replace `python3` with `uv run` in every command below; the script declares its Python requirement and uv provisions a compatible interpreter.
 
 2. Normalize the user's request into a concise prompt. Preserve exact text and explicitly state edit invariants such as `change only the background; keep the subject unchanged`.
 3. Generate or edit exactly once. A user request to create/edit an image authorizes that call; diagnostics alone do not authorize a billed smoke test.
@@ -40,11 +42,16 @@ python3 "<skill-dir>/scripts/sub2api_image_gen.py" edit \
 
 Use `--dry-run` to inspect a redacted request without network or cost. Use `--provider NAME` or `--config PATH` only when the active Codex provider is not the intended route. `OPENAI_BASE_URL` and `OPENAI_API_KEY` override config values when set.
 
+The config path is `--config`, then `$CODEX_HOME/config.toml`, then `~/.codex/config.toml`. Key precedence is environment, provider token, then `auth.json` beside the selected config. Only the top-level `OPENAI_API_KEY` is read, never OAuth tokens. The endpoint must still come from environment/config; auth fallback never switches providers or defaults to an official endpoint. Ensure the key belongs to that endpoint.
+
 ## Resolution
 
-- Default `gpt-image-2` request: `3840x2160`, the experimental maximum landscape request accepted by the current Image API constraints. Use `2160x3840` for maximum portrait output.
+- Default model: `gpt-image-2.5-sunburst`, size `auto`. Choose `--model gpt-image-2.5-flare` for fast everyday generation; Sunburst prioritizes editing precision. Both support generation and editing, and dated `-2026-09-08` snapshots. All commands accept `--model`; no separate variant parameter is needed. The bare `gpt-image-2.5` is only a provider-specific alias, warns when explicitly used, and must never be reported as a verified official variant.
+- Official 2.5 quality settings: `low`, `medium`, `high`, `xhigh`, `max`, `auto`. Client default remains `medium` (official default is `auto`). Both models have equal token rates, not necessarily equal per-image costs.
+- Official 2.5 size constraints: multiples of 16, max edge 3840, aspect ratio 1:3 to 3:1, 655,360–8,294,400 pixels; above 2560x1440 is experimental. Transparent output supports PNG/WebP. Source: [Image generation guide](https://developers.openai.com/api/docs/guides/image-generation), checked 2026-09-27.
+- With `--model gpt-image-2`, default request: `3840x2160`, the experimental maximum landscape request accepted by the current Image API constraints. Use `2160x3840` for maximum portrait output.
 - Provider-returned bytes are authoritative. The client reports any requested/actual mismatch and never upscales, resamples, or pads locally.
-- sub2api account routes differ. OpenAI OAuth can pass `3840x2160` upstream yet return `1672x941`; API-key routes or other compatible providers may return a larger image. Keep the maximum request as the portable default instead of hard-coding one OAuth result as every provider's ceiling.
+- sub2api account routes differ. OpenAI OAuth can pass `3840x2160` upstream yet return `1672x941`; API-key routes or other compatible providers may return a larger image. Do not hard-code one OAuth result as every provider's ceiling.
 - Evidence: [OpenAI `gpt-image-2` sizes](https://developers.openai.com/cookbook/examples/multimodal/image-gen-models-prompting-guide#popular-gpt-image-2-sizes) and [sub2api OAuth actual-size test](https://github.com/Wei-Shaw/sub2api/blob/d45135d87df16d48637f04ccd245727bc955ba54/backend/internal/service/openai_images_actual_size_test.go#L42-L54).
 
 ## Boundaries
@@ -53,5 +60,5 @@ Use `--dry-run` to inspect a redacted request without network or cost. Use `--pr
 - Never auto-retry a paid request. Surface the API error and change only the demonstrated cause.
 - Never claim requested dimensions are actual dimensions; report the decoded/API-reported output size.
 - Do not overwrite an existing file unless the user requested replacement; otherwise choose a versioned filename. `--force` is explicit overwrite authorization.
-- `gpt-image-2` supports transparent output. For a transparent background, keep the default model and pass `--background transparent --output-format png` (or `webp`).
+- `gpt-image-2` supports transparent output. For a transparent background, pass `--model gpt-image-2` and `--background transparent --output-format png` (or `webp`).
 - Prefer the built-in `image_gen` tool when it is actually available and working. This skill exists for the custom-provider fallback path.

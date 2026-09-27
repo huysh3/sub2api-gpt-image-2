@@ -1,4 +1,8 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.11"
+# dependencies = []
+# ///
 """Generate or edit images through a Codex custom provider without the OpenAI SDK."""
 
 from __future__ import annotations
@@ -20,7 +24,9 @@ import urllib.request
 import uuid
 
 USER_AGENT = "codex-sub2api-imagegen/1.0"
-DEFAULT_MODEL = "gpt-image-2"
+DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+IMAGE_25_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
+                   "gpt-image-2.5-sunburst-2026-09-08", "gpt-image-2.5-flare-2026-09-08"}
 DEFAULT_SIZE = "3840x2160"
 DEFAULT_OUT = "output/imagegen/output.png"
 MAX_INPUT_BYTES = 50 * 1024 * 1024
@@ -41,8 +47,6 @@ def load_route(config_path: Path, provider_name: str | None) -> tuple[str, dict[
     config: dict[str, Any] = {}
     if config_path.exists():
         config = tomllib.loads(config_path.read_text(encoding="utf-8"))
-    elif not (env_url and env_key):
-        fail(f"Codex config not found: {config_path}")
 
     name = provider_name or str(config.get("model_provider", ""))
     provider = config.get("model_providers", {}).get(name, {}) if name else {}
@@ -50,8 +54,17 @@ def load_route(config_path: Path, provider_name: str | None) -> tuple[str, dict[
     token = env_key or provider.get("experimental_bearer_token")
     if not isinstance(base_url, str) or not base_url.startswith(("https://", "http://")):
         fail("No valid provider base URL. Set OPENAI_BASE_URL or configure model_providers.<name>.base_url.")
+    auth_path = config_path.with_name("auth.json")
+    used_auth = False
+    if not token and auth_path.exists():
+        try:
+            auth = json.loads(auth_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            fail(f"Cannot read valid JSON from {auth_path}.")
+        token = auth.get("OPENAI_API_KEY") if isinstance(auth, dict) else None
+        used_auth = bool(token)
     if not isinstance(token, str) or not token:
-        fail("No provider token. Set OPENAI_API_KEY or configure experimental_bearer_token locally.")
+        fail("No provider token. Set OPENAI_API_KEY, configure experimental_bearer_token, or add OPENAI_API_KEY to auth.json beside config.toml. OAuth login tokens are not supported.")
 
     custom = provider.get("http_headers", {})
     headers = {
@@ -61,6 +74,8 @@ def load_route(config_path: Path, provider_name: str | None) -> tuple[str, dict[
     } if isinstance(custom, dict) else {}
     headers.update({"Authorization": f"Bearer {token}", "User-Agent": USER_AGENT, "Accept": "application/json"})
     source = "environment" if env_url or env_key else f"Codex provider {name}"
+    if used_auth:
+        source += " (API key from auth.json)"
     return base_url.rstrip("/"), headers, source
 
 
@@ -168,14 +183,16 @@ def multipart(fields: dict[str, str], files: list[tuple[str, Path]]) -> tuple[by
 
 
 def common_payload(args: argparse.Namespace) -> dict[str, Any]:
+    if args.size is None:
+        args.size = DEFAULT_SIZE if args.model == "gpt-image-2" else "auto"
     if not args.prompt.strip():
         fail("--prompt must not be blank.")
     if not 1 <= args.n <= 10:
         fail("--n must be between 1 and 10.")
-    if args.model == "gpt-image-2" and args.size != "auto":
+    if (args.model == "gpt-image-2" or args.model in IMAGE_25_MODELS) and args.size != "auto":
         match = re.fullmatch(r"([1-9][0-9]*)x([1-9][0-9]*)", args.size)
         if not match:
-            fail("gpt-image-2 --size must be auto or WIDTHxHEIGHT.")
+            fail(f"{args.model} --size must be auto or WIDTHxHEIGHT.")
         width, height = map(int, match.groups())
         long_edge, short_edge = max(width, height), min(width, height)
         if (
@@ -185,7 +202,7 @@ def common_payload(args: argparse.Namespace) -> dict[str, Any]:
             or long_edge / short_edge > 3
             or not 655_360 <= width * height <= 8_294_400
         ):
-            fail("gpt-image-2 size exceeds its edge, alignment, ratio, or pixel-count limits.")
+            fail(f"{args.model} size exceeds its edge, alignment, ratio, or pixel-count limits.")
     return {key: value for key, value in {
         "model": args.model,
         "prompt": args.prompt.strip(),
@@ -198,6 +215,8 @@ def common_payload(args: argparse.Namespace) -> dict[str, Any]:
 
 
 def route(args: argparse.Namespace) -> tuple[str, dict[str, str], str]:
+    if args.model == "gpt-image-2.5":
+        print("Warning: gpt-image-2.5 is not a documented official model ID; use gpt-image-2.5-sunburst or gpt-image-2.5-flare. Passing through as a provider-specific alias; actual model is unverified.", file=sys.stderr)
     base_url, headers, source = load_route(Path(args.config).expanduser(), args.provider)
     return base_url, headers, source
 
@@ -259,8 +278,8 @@ def parser() -> argparse.ArgumentParser:
     for name, handler in (("generate", generate), ("edit", edit)):
         command = commands.add_parser(name, parents=[common])
         command.add_argument("--prompt", required=True)
-        command.add_argument("--size", default=DEFAULT_SIZE)
-        command.add_argument("--quality", choices=("low", "medium", "high", "auto"), default="medium")
+        command.add_argument("--size", help="Default: 3840x2160 for gpt-image-2, auto for other models.")
+        command.add_argument("--quality", choices=("low", "medium", "high", "xhigh", "max", "auto"), default="medium", help="xhigh/max require GPT Image 2.5 or provider support.")
         command.add_argument("--n", type=int, default=1)
         command.add_argument("--background", choices=("transparent", "opaque", "auto"))
         command.add_argument("--output-format", choices=("png", "jpeg", "webp"), default="png")
