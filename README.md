@@ -2,7 +2,7 @@
 
 ![GPT Image 2.6 Sunburst / Flare：剪纸翠鸟从连续画格中飞向日出](assets/sub2api-imagegen-hero-2.6.jpg)
 
-一个给 Codex 使用的图片生成 Skill：当内置 `$imagegen` 不可用、缺失或被自定义 provider / sub2api 拦截时，改用当前 Codex provider 直接调用兼容的 Images API。
+一个给 Codex 使用的图片生成 Skill。你可以直接说「用 GPT Image」来走当前 Codex provider 的 Images API。普通生图请求也可在内置工具不可用时使用这条路径。
 
 ## 特点
 
@@ -31,32 +31,25 @@ git clone https://github.com/huysh3/sub2api-gpt-image-2.git ~/.agents/skills/sub
 
 ## 使用
 
-在提示词中指定模型，Codex 会把选择转换为客户端的 `--model` 参数：
+直接说「GPT Image」或「GPT Image 2.6」，加上要生成或编辑的内容即可。Codex 会自动选型号并传入完整 ID。
 
 ```text
-$sub2api-imagegen 用 Flare 快速生成一张雨夜霓虹街道的横版图片
+用 GPT Image 生成一张雨夜霓虹街道的横版图片
 ```
 
 ```text
-$sub2api-imagegen 用 Sunburst 编辑 input.png，只把背景换成日落，主体和文字保持不变
-```
-
-也可以直接写完整模型名，例如：
-
-```text
-$sub2api-imagegen 使用 gpt-image-2.6-sunburst，纯文字生成一张像素风海报，不使用参考图
+用 GPT Image 2.6 把 input.png 的整体色温调暖一点，其余保持原样
 ```
 
 | 提示词意图 | Codex 传入的模型 |
 | --- | --- |
 | 明确指定 Flare / Sunburst 或完整模型名 | 严格使用指定型号，优先于下面的自动选择 |
-| 未指定型号，强调快速、草稿、日常生图 | `gpt-image-2.6-flare` |
-| 未指定型号，强调精细编辑、保留主体或文字细节 | `gpt-image-2.6-sunburst` |
-| 未指定型号，也没有明确偏好 | `gpt-image-2.6-sunburst`（默认） |
+| 只对已有图片做明确的小幅微调，例如略微提亮或调暖 | `gpt-image-2.6-flare` |
+| 新图、较大改动、需要保留精确细节，或难度不明确 | `gpt-image-2.6-sunburst`（默认） |
 
-2.6 两个型号都能生成和编辑。上述路由由 Codex 按 SKILL 指令执行；Python 客户端不会解析 `--prompt` 中的模型名。直接运行命令时必须用 `--model` 选择，不能只在画面描述里写“Flare”。若所选型号不可用，报告错误，不静默换型号。
+普通请求会直接选型，即使是草稿也优先 Sunburst。只有在凭现有信息无法判断、且选错会明显影响结果时，才请用户选一次。例如精细编辑需要 Sunburst，但上游只提供 Flare。
 
-Codex 当前显式调用 Skill 使用 `$skill-name`；不需要手动执行底层 Python 命令。只有排查 provider 连通性时才需要：
+也可以在 Codex 中用 `$sub2api-imagegen` 显式调用。直接运行 Python 客户端时，可用 `--model` 覆盖默认值。排查 provider 连通性可运行：
 
 ```bash
 python3 ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
@@ -66,15 +59,15 @@ python3 ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
 
 ```bash
 uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
-uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate --model gpt-image-2.6-flare --prompt "雨夜霓虹街道" --out output/imagegen/street.png
+uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate --model gpt-image-2.6-sunburst --prompt "雨夜霓虹街道" --out output/imagegen/street.png
 ```
 
 `generate`、`edit`、`doctor` 均通过 `--model` 选择完整模型名，无需额外分型参数：
 
 | 模型 | 适用场景 |
 | --- | --- |
-| `gpt-image-2.6-sunburst`（本客户端默认） | 精细编辑、强调保留参考图细节 |
-| `gpt-image-2.6-flare` | 快速、日常高质量生图；也支持编辑 |
+| `gpt-image-2.6-sunburst`（本客户端默认） | 新图、较大改动和精细编辑 |
+| `gpt-image-2.6-flare` | 小幅微调，或用户点名时用于生成和编辑 |
 
 仍可用完整 ID 指定 `gpt-image-2.5-sunburst`、`gpt-image-2.5-flare` 或其 `-2026-09-08` 快照。版本号本身不是路由规则，`--model` 传给上游时保留原值。`gpt-image-2.5` 和 `gpt-image-2.6` 不是官方型号 ID。
 

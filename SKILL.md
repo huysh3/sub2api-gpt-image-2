@@ -1,6 +1,6 @@
 ---
 name: "sub2api-imagegen"
-description: "Generate or edit raster images and animated GIFs, or generate prompt-based SVG artwork through the current Codex custom provider or sub2api when the built-in image_gen tool is unavailable, missing, or blocked. Use for image assets and visual variants; do not use for hand-authored SVG, HTML/CSS, diagrams, or other deterministic code-native visuals."
+description: "Generate or edit images with GPT Image through the current Codex custom provider or sub2api. Use this skill when an image task asks for GPT Image, GPT Image 2.6, Sunburst, or Flare, including Chinese requests such as ‘用 GPT Image 2.6 改图’. No full model ID or $sub2api-imagegen invocation is required. Also use for GIF animation and prompt-based SVG art on this route, or as a fallback for generic image tasks when the built-in image tool is unavailable. Skip informational questions and deterministic visuals."
 ---
 
 # Sub2API Image Generation
@@ -24,8 +24,9 @@ Use the bundled dependency-free client instead of the system `imagegen` CLI. It 
 
 ## Prompt routing
 
-- An explicit Flare, Sunburst, full model ID, or dated snapshot requested by the user takes precedence over inferred intent. Map Flare to `gpt-image-2.6-flare` and Sunburst to `gpt-image-2.6-sunburst`; preserve explicitly requested full IDs/snapshots.
-- Without an explicit model, use Flare for speed, drafts, or everyday generation requests; use Sunburst for precise editing, preserving subject/text details, or when no preference is given. If both speed and detail are requested without a model, prefer Sunburst for preservation-critical edits.
+- In an image request, “GPT Image” and “GPT Image 2.6” select the 2.6 family and leave the variant to you. Map an explicit Sunburst or Flare to its full 2.6 ID. Honor an explicit full model ID or dated snapshot as written.
+- Default to `gpt-image-2.6-sunburst` for new images, substantial edits, exact text or identity preservation, and uncertain scope. Use `gpt-image-2.6-flare` automatically only for a clearly minor, low-risk tweak to an existing image, such as slightly warming its tone or brightening it. A request for speed or a draft alone still uses Sunburst.
+- Choose without asking in normal cases. Ask once only if the request or provider availability leaves a consequential choice that the user's instructions cannot resolve, such as whether a precision-critical edit may use Flare when Sunburst is unavailable. Explain the concrete tradeoff.
 - Both models support generation and editing. Choose `generate` versus `edit` from whether the user wants a new image or an edit/reference workflow, not from the model name. Never send a reference image when the user requests text-only generation.
 - Pass the selected full ID via `--model` to both doctor and generate/edit. Merely mentioning a model in `--prompt` does not route the Python client. Report unavailable models; never silently switch variants or endpoints.
 
@@ -33,7 +34,7 @@ Generate:
 
 ```bash
 python3 "<skill-dir>/scripts/sub2api_image_gen.py" generate \
-  --model gpt-image-2.6-flare \
+  --model gpt-image-2.6-sunburst \
   --prompt "A ceramic coffee mug in soft studio light; no logo, text, or watermark" \
   --quality medium \
   --out output/imagegen/mug.png
@@ -69,4 +70,4 @@ The config path is `--config`, then `$CODEX_HOME/config.toml`, then `~/.codex/co
 - Never claim requested dimensions are actual dimensions; report the decoded/API-reported output size.
 - Do not overwrite an existing file unless the user requested replacement; otherwise choose a versioned filename. `--force` is explicit overwrite authorization.
 - GPT Image 2.5 and 2.6 variants support transparent output. Keep the selected model and pass `--background transparent --output-format png` (or `webp`).
-- Prefer the built-in `image_gen` tool when it is actually available and working. This skill exists for the custom-provider fallback path.
+- An image request that explicitly selects GPT Image, a variant, or this skill uses the custom-provider route. For generic image requests, prefer the built-in tool when available and working.

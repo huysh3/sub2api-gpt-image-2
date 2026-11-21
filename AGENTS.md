@@ -7,4 +7,4 @@
 - Keep README.md and SKILL.md synchronized with CLI defaults, routing, and startup instructions.
 - Verify with `uv run --python 3.11 tests/test_sub2api_image_gen.py` and `git diff --check`. Local tests use dummy credentials; do not run paid generation solely for verification.
 
-- Public usage docs focus on GPT Image 2.6. Prompt routing lives in SKILL.md: explicit model wins; speed/drafts use Flare, precise edits/default use Sunburst. Always pass the selected full ID via --model; the CLI does not route prompt text.
+- Prompt routing lives in SKILL.md. “GPT Image” and “GPT Image 2.6” invoke the skill for image tasks. An explicit variant wins. Otherwise default to Sunburst and choose Flare only for a clearly minor edit. Ask only if a consequential tradeoff cannot be resolved from the request. The skill passes the full ID via `--model`.
