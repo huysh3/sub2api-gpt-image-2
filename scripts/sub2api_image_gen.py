@@ -24,11 +24,13 @@ import urllib.request
 import uuid
 
 USER_AGENT = "codex-sub2api-imagegen/1.0"
-DEFAULT_MODEL = "gpt-image-2.5-sunburst"
+DEFAULT_MODEL = "gpt-image-2.6-sunburst"
+IMAGE_26_MODELS = {DEFAULT_MODEL, "gpt-image-2.6-flare"}
 IMAGE_25_MODELS = {"gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
                    "gpt-image-2.5-sunburst-2026-09-08", "gpt-image-2.5-flare-2026-09-08"}
+CUSTOM_SIZE_MODELS = IMAGE_26_MODELS | IMAGE_25_MODELS | {"gpt-image-2"}
 DEFAULT_SIZE = "3840x2160"
-DEFAULT_OUT = "output/imagegen/output.png"
+DEFAULT_OUT = "output/imagegen/output"
 MAX_INPUT_BYTES = 50 * 1024 * 1024
 
 
@@ -189,7 +191,7 @@ def common_payload(args: argparse.Namespace) -> dict[str, Any]:
         fail("--prompt must not be blank.")
     if not 1 <= args.n <= 10:
         fail("--n must be between 1 and 10.")
-    if (args.model == "gpt-image-2" or args.model in IMAGE_25_MODELS) and args.size != "auto":
+    if args.model in CUSTOM_SIZE_MODELS and args.size != "auto":
         match = re.fullmatch(r"([1-9][0-9]*)x([1-9][0-9]*)", args.size)
         if not match:
             fail(f"{args.model} --size must be auto or WIDTHxHEIGHT.")
@@ -203,6 +205,19 @@ def common_payload(args: argparse.Namespace) -> dict[str, Any]:
             or not 655_360 <= width * height <= 8_294_400
         ):
             fail(f"{args.model} size exceeds its edge, alignment, ratio, or pixel-count limits.")
+    if args.output_format == "svg" and args.n != 1:
+        fail("SVG output requires --n 1.")
+    if args.frame_count is not None or args.frame_duration_ms is not None:
+        if args.output_format != "gif":
+            fail("Frame settings require --output-format gif.")
+        if args.frame_count is not None and not 2 <= args.frame_count <= 16:
+            fail("--frame-count must be between 2 and 16.")
+        if args.frame_duration_ms is not None and not 20 <= args.frame_duration_ms <= 2000:
+            fail("--frame-duration-ms must be between 20 and 2000.")
+    if args.model in CUSTOM_SIZE_MODELS - IMAGE_26_MODELS and (
+        args.complexity is not None or args.output_format in {"gif", "svg"}
+    ):
+        fail("Complexity, GIF and SVG require GPT Image 2.6 or provider support.")
     return {key: value for key, value in {
         "model": args.model,
         "prompt": args.prompt.strip(),
@@ -211,12 +226,15 @@ def common_payload(args: argparse.Namespace) -> dict[str, Any]:
         "quality": args.quality,
         "background": args.background,
         "output_format": args.output_format,
+        "complexity": args.complexity,
+        "frame_count": args.frame_count,
+        "frame_duration_ms": args.frame_duration_ms,
     }.items() if value is not None}
 
 
 def route(args: argparse.Namespace) -> tuple[str, dict[str, str], str]:
-    if args.model == "gpt-image-2.5":
-        print("Warning: gpt-image-2.5 is not a documented official model ID; use gpt-image-2.5-sunburst or gpt-image-2.5-flare. Passing through as a provider-specific alias; actual model is unverified.", file=sys.stderr)
+    if args.model in {"gpt-image-2.5", "gpt-image-2.6"}:
+        print(f"Warning: {args.model} is not a documented official model ID; use {args.model}-sunburst or {args.model}-flare. Passing through as a provider-specific alias; actual model is unverified.", file=sys.stderr)
     base_url, headers, source = load_route(Path(args.config).expanduser(), args.provider)
     return base_url, headers, source
 
@@ -279,10 +297,14 @@ def parser() -> argparse.ArgumentParser:
         command = commands.add_parser(name, parents=[common])
         command.add_argument("--prompt", required=True)
         command.add_argument("--size", help="Default: 3840x2160 for gpt-image-2, auto for other models.")
-        command.add_argument("--quality", choices=("low", "medium", "high", "xhigh", "max", "auto"), default="medium", help="xhigh/max require GPT Image 2.5 or provider support.")
+        command.add_argument("--quality", choices=("low", "medium", "high", "xhigh", "max", "auto"), default="medium", help="xhigh/max require GPT Image 2.5, 2.6 or provider support.")
+        command.add_argument("--complexity", choices=("low", "medium", "high"), help="GPT Image 2.6 planning effort (API default: high).")
         command.add_argument("--n", type=int, default=1)
         command.add_argument("--background", choices=("transparent", "opaque", "auto"))
-        command.add_argument("--output-format", choices=("png", "jpeg", "webp"), default="png")
+        formats = ("png", "jpeg", "webp", "gif") + (("svg",) if name == "generate" else ())
+        command.add_argument("--output-format", choices=formats, default="png")
+        command.add_argument("--frame-count", type=int, help="GIF frame count (2–16).")
+        command.add_argument("--frame-duration-ms", type=int, help="GIF frame duration (20–2000 ms).")
         command.add_argument("--out", default=DEFAULT_OUT)
         command.add_argument("--force", action="store_true")
         command.add_argument("--dry-run", action="store_true")

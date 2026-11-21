@@ -1,6 +1,6 @@
 # codex-sub2api-image-gen
 
-![GPT Image 2.5：Sunburst 精细编辑、Flare 快速生图，支持 auth.json 回退和 uv 启动](assets/sub2api-imagegen-hero-2.5-workshops.png)
+![GPT Image 2.6 Sunburst / Flare：剪纸翠鸟从连续画格中飞向日出](assets/sub2api-imagegen-hero-2.6.jpg)
 
 一个给 Codex 使用的图片生成 Skill：当内置 `$imagegen` 不可用、缺失或被自定义 provider / sub2api 拦截时，改用当前 Codex provider 直接调用兼容的 Images API。
 
@@ -10,7 +10,7 @@
 - 使用非 OpenAI SDK 的 User-Agent，绕开已知的 sub2api / Cloudflare SDK 请求头拦截。
 - 支持图片生成、图片编辑、无费用连通性检查和脱敏 dry run。
 - 仅依赖 Python 标准库，不安装 OpenAI SDK。
-- 默认使用 `gpt-image-2.5-sunburst`，尺寸为 `auto`；服务端返回多大就原样保存多大，不在本地超分、缩放、补边或重采样。
+- 默认使用 `gpt-image-2.6-sunburst`，尺寸为 `auto`；服务端返回多大就原样保存多大，不在本地超分、缩放、补边或重采样。
 
 ## 环境要求
 
@@ -44,17 +44,17 @@ $sub2api-imagegen 用 Sunburst 编辑 input.png，只把背景换成日落，主
 也可以直接写完整模型名，例如：
 
 ```text
-$sub2api-imagegen 使用 gpt-image-2.5-sunburst，纯文字生成一张像素风海报，不使用参考图
+$sub2api-imagegen 使用 gpt-image-2.6-sunburst，纯文字生成一张像素风海报，不使用参考图
 ```
 
 | 提示词意图 | Codex 传入的模型 |
 | --- | --- |
 | 明确指定 Flare / Sunburst 或完整模型名 | 严格使用指定型号，优先于下面的自动选择 |
-| 未指定型号，强调快速、草稿、日常生图 | `gpt-image-2.5-flare` |
-| 未指定型号，强调精细编辑、保留主体或文字细节 | `gpt-image-2.5-sunburst` |
-| 未指定型号，也没有明确偏好 | `gpt-image-2.5-sunburst`（默认） |
+| 未指定型号，强调快速、草稿、日常生图 | `gpt-image-2.6-flare` |
+| 未指定型号，强调精细编辑、保留主体或文字细节 | `gpt-image-2.6-sunburst` |
+| 未指定型号，也没有明确偏好 | `gpt-image-2.6-sunburst`（默认） |
 
-两型号都能生成和编辑。上述路由由 Codex 按 SKILL 指令执行；Python 客户端不会解析 `--prompt` 中的模型名。直接运行命令时必须用 `--model` 选择，不能只在画面描述里写“Flare”。若所选型号不可用，报告错误，不静默换型号。
+2.6 两个型号都能生成和编辑。上述路由由 Codex 按 SKILL 指令执行；Python 客户端不会解析 `--prompt` 中的模型名。直接运行命令时必须用 `--model` 选择，不能只在画面描述里写“Flare”。若所选型号不可用，报告错误，不静默换型号。
 
 Codex 当前显式调用 Skill 使用 `$skill-name`；不需要手动执行底层 Python 命令。只有排查 provider 连通性时才需要：
 
@@ -66,23 +66,27 @@ python3 ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
 
 ```bash
 uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py doctor
-uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate --model gpt-image-2.5-flare --prompt "雨夜霓虹街道" --out output/imagegen/street.png
+uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate --model gpt-image-2.6-flare --prompt "雨夜霓虹街道" --out output/imagegen/street.png
 ```
 
 `generate`、`edit`、`doctor` 均通过 `--model` 选择完整模型名，无需额外分型参数：
 
 | 模型 | 适用场景 |
 | --- | --- |
-| `gpt-image-2.5-sunburst`（本客户端默认） | 精细编辑、强调保留参考图细节 |
-| `gpt-image-2.5-flare` | 快速、日常高质量生图；也支持编辑 |
+| `gpt-image-2.6-sunburst`（本客户端默认） | 精细编辑、强调保留参考图细节 |
+| `gpt-image-2.6-flare` | 快速、日常高质量生图；也支持编辑 |
 
-两者都支持 `-2026-09-08` 快照名。`gpt-image-2.5` 不是官方文档列出的模型 ID；显式传入时仅作为代理自定义别名透传并警告，不自动映射或回退。模型列表和出图成功均不能证明代理实际使用的上游分型。
+仍可用完整 ID 指定 `gpt-image-2.5-sunburst`、`gpt-image-2.5-flare` 或其 `-2026-09-08` 快照。版本号本身不是路由规则，`--model` 传给上游时保留原值。`gpt-image-2.5` 和 `gpt-image-2.6` 不是官方型号 ID。
 
-`--quality` 支持 `low/medium/high/xhigh/max/auto`，其中 `xhigh/max` 是 2.5 新增档位；客户端保留 `medium` 默认值，官方默认是 `auto`。两型号 token 单价相同，但耗用 token 可不同，不代表每张图同价。
+`--quality` 支持 `low/medium/high/xhigh/max/auto`，客户端默认 `medium`。2.5 和 2.6 的默认尺寸为 `auto`。显式尺寸须为 16 的倍数，最长边 ≤3840，宽高比在 1:3～3:1，总像素 655,360～8,294,400。2.5 高于 2560×1440 属实验范围。透明背景使用 PNG 或 WebP。
 
-2.5 默认尺寸为 `auto`；显式尺寸须为 16 的倍数，最长边 ≤3840，宽高比在 1:3～3:1，总像素 655,360～8,294,400；高于 2560×1440 属实验范围。透明背景使用 PNG 或 WebP。
+2.6 支持 `--complexity low|medium|high` 调整生成和编辑的规划程度。省略时由 API 使用 `high`。生成与编辑都可用 `--output-format gif` 输出动画，并可指定 `--frame-count 2–16` 和 `--frame-duration-ms 20–2000`。GIF 用 `auto` 尺寸可让上游按像素预算选取帧尺寸。用 `generate --output-format svg` 可生成单张 SVG。指定 `--out` 时，省略扩展名可让客户端自动补上格式后缀。
 
-来源：[官方生图指南](https://developers.openai.com/api/docs/guides/image-generation)、[Sunburst](https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst)、[Flare](https://developers.openai.com/api/docs/models/gpt-image-2.5-flare)（2026-09-27 核对）。当前 Hero 仅通过文字提示词生成，未传入参考图；请求使用 `model=gpt-image-2.5-sunburst`、`quality=high`，服务端返回 1672×941，原样保存。
+```bash
+uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate --model gpt-image-2.6-flare --prompt "剪纸翠鸟拍动翅膀，循环回到起始姿势" --output-format gif --frame-count 9 --frame-duration-ms 200 --out output/imagegen/kingfisher.gif
+```
+
+参见 [OpenAI GPT Image 2.6 指南](https://developers.openai.com/api/docs/guides/image-generation#gpt-image-26)。
 
 ## 路由与凭证
 

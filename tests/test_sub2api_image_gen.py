@@ -15,6 +15,10 @@ from unittest.mock import patch
 
 
 PNG_1X1 = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XxKjWQAAAABJRU5ErkJggg==")
+GIF_1X1 = base64.b64decode("R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7")
+SVG = b'<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>'
+TEST_KEY = "test-only-key"
+MODELS = ("gpt-image-2.6-sunburst", "gpt-image-2.6-flare", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2")
 SCRIPT = Path(__file__).parents[1] / "scripts/sub2api_image_gen.py"
 spec = importlib.util.spec_from_file_location("image_client", SCRIPT)
 client = importlib.util.module_from_spec(spec)
@@ -27,31 +31,29 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         assert self.path == "/v1/models"
-        assert self.headers["Authorization"] == "Bearer not-a-secret"
+        assert self.headers["Authorization"] == f"Bearer {TEST_KEY}"
         assert self.headers["User-Agent"] == "codex-sub2api-imagegen/1.0"
-        self.reply(json.dumps({"data": [{"id": model} for model in
-                              ("gpt-image-2.5-sunburst", "gpt-image-2.5-flare", "gpt-image-2")]}).encode())
+        self.reply(json.dumps({"data": [{"id": model} for model in MODELS]}).encode())
 
     def do_POST(self):
         assert self.path in {"/v1/images/generations", "/v1/images/edits"}
-        assert self.headers["Authorization"] == "Bearer not-a-secret"
+        assert self.headers["Authorization"] == f"Bearer {TEST_KEY}"
         assert self.headers["X-Test-Header"] == "kept"
         request = self.rfile.read(int(self.headers["Content-Length"]))
-        model, size, quality = self.server.expected
+        expected, response = self.server.expected
         if self.path.endswith("/edits"):
             assert b'name="image"' in request
             assert PNG_1X1 in request
-            for key, value in (("model", model), ("size", size), ("quality", quality)):
+            for key, value in expected.items():
                 assert f'name="{key}"\r\n\r\n{value}\r\n'.encode() in request
         else:
             payload = json.loads(request)
-            assert payload["model"] == model
-            assert payload["size"] == size
-            assert payload["quality"] == quality
+            for key, value in expected.items():
+                assert payload[key] == value
             if payload["prompt"] == "transparent image":
                 assert payload["background"] == "transparent"
                 assert payload["output_format"] == "png"
-        self.reply(json.dumps({"data": [{"b64_json": base64.b64encode(PNG_1X1).decode()}]}).encode())
+        self.reply(json.dumps({"data": [{"b64_json": base64.b64encode(response).decode()}]}).encode())
 
     def reply(self, payload):
         self.send_response(200)
@@ -126,7 +128,7 @@ def main():
             config = root / "config.toml"
             config.write_text(
                 f'model_provider = "test"\n[model_providers.test]\nbase_url = "{base_url}"\n'
-                'experimental_bearer_token = "not-a-secret"\nhttp_headers = { "X-Test-Header" = "kept" }\n'
+                f'experimental_bearer_token = "{TEST_KEY}"\nhttp_headers = {{ "X-Test-Header" = "kept" }}\n'
             )
             env = {key: value for key, value in os.environ.items()
                    if key not in {"OPENAI_BASE_URL", "OPENAI_API_KEY", "CODEX_HOME"}
@@ -138,19 +140,18 @@ def main():
                 assert (result.returncode == 0) == success, result.stdout + result.stderr
                 return result
 
-            for model, size, quality in (("gpt-image-2.5-sunburst", "auto", "xhigh"),
-                                         ("gpt-image-2.5-flare", "auto", "max"),
-                                         ("gpt-image-2", "3840x2160", "medium")):
-                options = [] if model == "gpt-image-2.5-sunburst" else ["--model", model]
+            for model, quality in zip(MODELS, ("xhigh", "max", "xhigh", "max", "medium"), strict=True):
+                size = "3840x2160" if model == "gpt-image-2" else "auto"
+                options = [] if model == "gpt-image-2.6-sunburst" else ["--model", model]
                 assert f"model: {model} (available)" in run("doctor", *options).stdout
-                server.expected = model, size, quality
+                server.expected = dict(model=model, size=size, quality=quality), PNG_1X1
                 output = root / f"{model}.png"
                 run("generate", *options, "--quality", quality, "--prompt", "transparent image", "--background", "transparent", "--output-format", "png", "--out", str(output))
                 assert output.read_bytes() == PNG_1X1
                 edited = root / f"{model}-edit.png"
                 run("edit", *options, "--quality", quality, "--image", str(output), "--prompt", "test image", "--out", str(edited))
                 assert edited.read_bytes() == PNG_1X1
-            for model in ("gpt-image-2", "gpt-image-2.5-sunburst", "gpt-image-2.5-flare",
+            for model in (*MODELS,
                           "gpt-image-2.5-sunburst-2026-09-08", "gpt-image-2.5-flare-2026-09-08"):
                 for size, success in (("1024x1024", True), ("3840x2160", True), ("auto", True),
                                       ("1000x1000", False), ("4096x4096", False),
@@ -159,18 +160,39 @@ def main():
                                  "--out", str(root / "dry.png"), "--dry-run", success=success)
                     if success:
                         assert json.loads(result.stdout)["payload"]["size"] == size
-            for model in ("future-model", "gpt-image-2.5"):
+            for command, inputs in (("generate", []), ("edit", ["--image", str(output)])):
+                server.expected = dict(model="gpt-image-2.6-sunburst", output_format="gif",
+                                       complexity="low", frame_count=4, frame_duration_ms=200), GIF_1X1
+                target = root / f"{command}-animated"
+                run(command, *inputs, "--prompt", "loop", "--output-format", "gif", "--complexity", "low",
+                    "--frame-count", "4", "--frame-duration-ms", "200", "--out", str(target))
+                assert target.with_suffix(".gif").read_bytes() == GIF_1X1
+            server.expected = dict(model="gpt-image-2.6-flare", output_format="svg", n=1), SVG
+            run("generate", "--model", "gpt-image-2.6-flare", "--prompt", "icon",
+                "--output-format", "svg", "--out", str(root / "icon"))
+            assert (root / "icon.svg").read_bytes() == SVG
+            for options, error in (
+                (["--frame-count", "4"], "Frame settings require"),
+                (["--output-format", "gif", "--frame-count", "17"], "between 2 and 16"),
+                (["--output-format", "gif", "--frame-duration-ms", "19"], "between 20 and 2000"),
+                (["--output-format", "svg", "--n", "2"], "SVG output requires"),
+                (["--model", "gpt-image-2.5-flare", "--complexity", "low"], "require GPT Image 2.6"),
+            ):
+                assert error in run("generate", "--prompt", "test image", *options, "--dry-run", success=False).stderr
+            assert "invalid choice" in run("edit", "--image", str(output), "--prompt", "test image",
+                                           "--output-format", "svg", "--dry-run", success=False).stderr
+            for model in ("future-model", "gpt-image-2.5", "gpt-image-2.6"):
                 result = run("generate", "--model", model, "--prompt", "test image",
                              "--out", str(root / "dry.png"), "--dry-run")
                 assert json.loads(result.stdout)["payload"]["model"] == model
-                if model == "gpt-image-2.5":
+                if model != "future-model":
                     assert "warning" in result.stderr.lower() and model in result.stderr
             auth_config = check_routes(root, base_url)
-            auth_config.with_name("auth.json").write_text(json.dumps({"OPENAI_API_KEY": "not-a-secret"}))
+            auth_config.with_name("auth.json").write_text(json.dumps({"OPENAI_API_KEY": TEST_KEY}))
             env["CODEX_HOME"] = str(auth_config.parent)
-            assert "gpt-image-2.5-sunburst (available)" in run("doctor").stdout
+            assert "gpt-image-2.6-sunburst (available)" in run("doctor").stdout
             env["CODEX_HOME"] = str(root)
-            assert "gpt-image-2.5-sunburst (available)" in run("doctor", "--config", str(auth_config)).stdout
+            assert "gpt-image-2.6-sunburst (available)" in run("doctor", "--config", str(auth_config)).stdout
     finally:
         server.shutdown()
         server.server_close()
