@@ -2,11 +2,11 @@
 
 ![GPT Image 2.6 Sunburst / Flare：剪纸翠鸟从连续画格中飞向日出](assets/sub2api-imagegen-hero-2.6.jpg)
 
-一个给 Codex 使用的图片生成 Skill。你可以直接说「用 GPT Image」来走当前 Codex provider 的 Images API。普通生图请求也可在内置工具不可用时使用这条路径。
+一个给 Codex 使用的图片生成 Skill。你可以直接说「用 GPT Image」来走配置好的 Images API。普通生图请求也可在内置工具不可用时使用这条路径。
 
 ## 特点
 
-- 自动读取当前 Codex provider 的 `base_url`、`experimental_bearer_token` 和自定义请求头。
+- 自动读取所选 provider 的 `base_url`、`experimental_bearer_token` 和自定义请求头，支持单独绑定图片 provider。
 - 使用非 OpenAI SDK 的 User-Agent，绕开已知的 sub2api / Cloudflare SDK 请求头拦截。
 - 支持图片生成、图片编辑、无费用连通性检查和脱敏 dry run。
 - 仅依赖 Python 标准库，不安装 OpenAI SDK。
@@ -83,9 +83,19 @@ uv run ~/.agents/skills/sub2api-imagegen/scripts/sub2api_image_gen.py generate -
 
 ## 路由与凭证
 
+如果 Codex 默认使用 Magpie 等对话入口，可以在每台电脑上给 Skill 单独指定图片 provider。保留 `config.toml` 顶层的 `model_provider`，在同目录新建 `sub2api-imagegen.toml`（通常是 `~/.codex/sub2api-imagegen.toml`）：
+
+```toml
+provider = "my-image-provider"
+```
+
+把 `my-image-provider` 换成该电脑 `config.toml` 中已有的 `[model_providers.<ID>]` 的 ID。若尚无图片 provider，先添加支持 Images API 的 provider 条目及对应凭证。绑定文件只写 ID。之后直接运行 `doctor`，应显示图片 provider 和模型是否可用；`generate` 和 `edit` 也会自动使用同一绑定。
+
 - 配置路径：`--config PATH` > `$CODEX_HOME/config.toml` > `~/.codex/config.toml`。
+- provider：`--provider ID` > 所选配置文件同目录的 `sub2api-imagegen.toml` > `config.toml` 顶层 `model_provider`。绑定无效时会报错，不回退到默认 provider。
 - endpoint：`OPENAI_BASE_URL` > 所选 provider 的 `base_url`；必须显式配置，不自动切换到 OpenAI 官方地址。
 - API key：`OPENAI_API_KEY` 环境变量 > provider 的 `experimental_bearer_token` > 配置文件同目录 `auth.json` 的顶层 `OPENAI_API_KEY`。
+- 如果终端里的 `OPENAI_BASE_URL` 或 `OPENAI_API_KEY` 是给 Magpie 设置的，只在图片命令的进程里取消相应变量，否则它们仍会覆盖图片 provider 的值。
 - 仅当前两项缺失时读取 `auth.json`；不读取 OAuth `tokens`。该 API key 会用于上述 endpoint，请确保二者匹配。使用 `--config` 时不会再读取默认目录的认证文件。
 - 仅有 `auth.json` 时，可设置 `OPENAI_BASE_URL`，无需创建 `config.toml`。dry run 会标明是否使用了认证文件，但不输出 key。
 

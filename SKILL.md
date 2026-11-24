@@ -5,7 +5,7 @@ description: "Generate or edit images with GPT Image through the current Codex c
 
 # Sub2API Image Generation
 
-Use the bundled dependency-free client instead of the system `imagegen` CLI. It reads the active provider's `base_url`, `experimental_bearer_token`, and `http_headers` from Codex config, falling back to the adjacent `auth.json` top-level `OPENAI_API_KEY` when no environment/config key is set, then sends a non-SDK User-Agent to avoid the known sub2api/Cloudflare SDK-header block.
+Use the bundled dependency-free client instead of the system `imagegen` CLI. It reads the selected provider's `base_url`, `experimental_bearer_token`, and `http_headers` from Codex config, falling back to the adjacent `auth.json` top-level `OPENAI_API_KEY` when no environment/config key is set, then sends a non-SDK User-Agent to avoid the known sub2api/Cloudflare SDK-header block.
 
 ## Workflow
 
@@ -50,9 +50,9 @@ python3 "<skill-dir>/scripts/sub2api_image_gen.py" edit \
   --out output/imagegen/sunset-edit.png
 ```
 
-Use `--dry-run` to inspect a redacted request without network or cost. Use `--provider NAME` or `--config PATH` only when the active Codex provider is not the intended route. `OPENAI_BASE_URL` and `OPENAI_API_KEY` override config values when set.
+Use `--dry-run` to inspect a redacted request without network or cost. To keep a separate Codex default such as Magpie, create `sub2api-imagegen.toml` next to the selected Codex config, with `provider = "my-image-provider"` using the actual ID of an existing `[model_providers.<ID>]` entry. The skill reads this binding for `doctor`, `generate`, and `edit`; leave Codex's `model_provider` unchanged. Invalid bindings fail rather than falling back. Provider precedence is `--provider ID`, then this binding, then Codex's `model_provider`. Pass the same explicit overrides to `doctor` and the image command when needed.
 
-The config path is `--config`, then `$CODEX_HOME/config.toml`, then `~/.codex/config.toml`. Key precedence is environment, provider token, then `auth.json` beside the selected config. Only the top-level `OPENAI_API_KEY` is read, never OAuth tokens. The endpoint must still come from environment/config; auth fallback never switches providers or defaults to an official endpoint. Ensure the key belongs to that endpoint.
+The config path is `--config`, then `$CODEX_HOME/config.toml`, then `~/.codex/config.toml`. `OPENAI_BASE_URL` and `OPENAI_API_KEY` override config values when set. If they are for the chat provider, leave them unset for the image command only. Key precedence is environment, provider token, then `auth.json` beside the selected config. Only the top-level `OPENAI_API_KEY` is read, never OAuth tokens. The endpoint must still come from environment/config; auth fallback never switches providers or defaults to an official endpoint. Ensure the key belongs to that endpoint.
 
 ## Output settings
 

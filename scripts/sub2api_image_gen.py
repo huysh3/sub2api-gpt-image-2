@@ -50,12 +50,30 @@ def load_route(config_path: Path, provider_name: str | None) -> tuple[str, dict[
     if config_path.exists():
         config = tomllib.loads(config_path.read_text(encoding="utf-8"))
 
+    providers = config.get("model_providers", {})
+    if provider_name is None:
+        binding_path = config_path.with_name("sub2api-imagegen.toml")
+        try:
+            binding = tomllib.loads(binding_path.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            pass
+        except (OSError, ValueError):
+            fail(f"Cannot read valid TOML from {binding_path}.")
+        else:
+            provider_name = binding.get("provider")
+            if not isinstance(provider_name, str) or not provider_name.strip():
+                fail(f'Set provider = "<provider ID>" in {binding_path}.')
+            if provider_name not in providers:
+                fail(f"Image provider {provider_name!r} from {binding_path} is not defined in {config_path}.")
+
     name = provider_name or str(config.get("model_provider", ""))
-    provider = config.get("model_providers", {}).get(name, {}) if name else {}
+    provider = providers.get(name, {}) if name else {}
     base_url = env_url or provider.get("base_url")
     token = env_key or provider.get("experimental_bearer_token")
     if not isinstance(base_url, str) or not base_url.startswith(("https://", "http://")):
-        fail("No valid provider base URL. Set OPENAI_BASE_URL or configure model_providers.<name>.base_url.")
+        fail(f"No valid provider base URL for {name or '(none)'!r} in {config_path}. "
+             "Set OPENAI_BASE_URL or configure the image provider's base_url and select it "
+             "with --provider or sub2api-imagegen.toml.")
     auth_path = config_path.with_name("auth.json")
     used_auth = False
     if not token and auth_path.exists():
@@ -285,7 +303,7 @@ def edit(args: argparse.Namespace) -> None:
 def parser() -> argparse.ArgumentParser:
     common = argparse.ArgumentParser(add_help=False)
     common.add_argument("--config", default=str(default_config_path()))
-    common.add_argument("--provider")
+    common.add_argument("--provider", help="Override the image provider in sub2api-imagegen.toml or Codex's default provider.")
     common.add_argument("--model", default=DEFAULT_MODEL)
 
     image = argparse.ArgumentParser(description=__doc__)

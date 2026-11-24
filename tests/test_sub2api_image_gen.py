@@ -127,7 +127,7 @@ def main():
             base_url = f"http://127.0.0.1:{server.server_port}/v1"
             config = root / "config.toml"
             config.write_text(
-                f'model_provider = "test"\n[model_providers.test]\nbase_url = "{base_url}"\n'
+                f'model_provider = "magpie"\n[model_providers.test]\nbase_url = "{base_url}"\n'
                 f'experimental_bearer_token = "{TEST_KEY}"\nhttp_headers = {{ "X-Test-Header" = "kept" }}\n'
             )
             env = {key: value for key, value in os.environ.items()
@@ -139,6 +139,16 @@ def main():
                 result = subprocess.run([sys.executable, str(SCRIPT), *args], env=env, capture_output=True, text=True)
                 assert (result.returncode == 0) == success, result.stdout + result.stderr
                 return result
+
+            binding = root / "sub2api-imagegen.toml"
+            assert "No valid provider base URL for 'magpie'" in run("doctor", success=False).stderr
+            binding.write_text('provider = "missing"\n')
+            assert "is not defined" in run("doctor", success=False).stderr
+            assert "Codex provider test" in run("doctor", "--provider", "test").stdout
+            binding.write_text('provider = [')
+            assert "Cannot read valid TOML" in run("doctor", success=False).stderr
+            binding.write_text('provider = "test"\n')
+            assert "Codex provider test" in run("doctor").stdout
 
             for model, quality in zip(MODELS, ("xhigh", "max", "xhigh", "max", "medium"), strict=True):
                 size = "3840x2160" if model == "gpt-image-2" else "auto"
